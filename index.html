@@ -70,28 +70,57 @@
         }
 
         @media screen and (max-width: 600px) {
+
             #legend {
                 top: 10px;
                 left: 10px;
                 right: 10px;
-                padding: 12px;
-                font-size: 11px;
-                line-height: 1.4;
+                padding: 10px;
+                font-size: 10px;
+                line-height: 1.3;
                 border-radius: 8px;
+                text-align: center;
             }
 
             #legend br {
                 display: block;
                 content: "";
-                margin-top: 4px;
+                margin-top: 2px;
+            }
+
+            #book {
+                width: 85vw;
+                height: 113vw;
+                margin-bottom: 20px;
+            }
+
+            .cover-title {
+                font-size: 1.5rem !important;
+                letter-spacing: 2px !important;
+            }
+
+            .answer-zh {
+                font-size: 1.3rem !important;
+                max-height: 280px !important;
+                letter-spacing: 0.15rem !important;
+            }
+
+            .answer-en {
+                font-size: 0.7rem !important;
+                white-space: normal !important;
+                padding-top: 10px !important;
+            }
+
+            #progress-bar-container {
+                width: 80vw !important;
             }
 
             #video-container {
-                width: 100px;
-                height: 75px;
+                width: 90px;
+                height: 68px;
                 bottom: 10px;
                 right: 10px;
-                opacity: 0.6;
+                opacity: 0.5;
             }
         }
 
@@ -108,12 +137,14 @@
 
         /* Book Structure */
         #book {
-            width: 450px;
-            height: 600px;
+            width: 90vw;
+            max-width: 450px;
+            height: 120vw;
+            max-height: 600px;
             position: relative;
             transform-style: preserve-3d;
             transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-            margin-bottom: 40px;
+            margin-bottom: 20px;
         }
 
         .page {
@@ -124,7 +155,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 40px;
+            padding: 5%;
             box-sizing: border-box;
             border-radius: 4px;
             backface-visibility: hidden;
