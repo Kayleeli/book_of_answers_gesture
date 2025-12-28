@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>答案之书 - Gesture Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <style>
+        :root {
+            --paper-color: #000000;
+            --ink-color: #ffffff;
+            --cover-color: #000000;
+            --gold-color: #d4af37;
+            --paper-grain: url('https://www.transparenttextures.com/patterns/leather.png');
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0a0a0a;
+            font-family: "Noto Serif SC", "Source Han Serif SC", serif;
+        }
+
+        /* UI Elements */
+        /* UI Elements */
+        #legend {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            line-height: 1.8;
+            z-index: 100;
+            letter-spacing: 1px;
+            background: rgba(20, 20, 20, 0.85);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+            /* Optional: adds a nice frosted glass effect */
+            pointer-events: none;
+            /* Allows clicks to pass through to the book */
+        }
+
+        #video-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 160px;
+            height: 120px;
+            border-radius: 8px;
+            overflow: hidden;
+            opacity: 0.4;
+            transform: scaleX(-1);
+            z-index: 50;
+            border: 1px solid #444;
+            transition: all 0.3s ease;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        @media screen and (max-width: 600px) {
+            #legend {
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                padding: 12px;
+                font-size: 11px;
+                line-height: 1.4;
+                border-radius: 8px;
+            }
+
+            #legend br {
+                display: block;
+                content: "";
+                margin-top: 4px;
+            }
+
+            #video-container {
+                width: 100px;
+                height: 75px;
+                bottom: 10px;
+                right: 10px;
+                opacity: 0.6;
+            }
+        }
+
+        #app-viewport {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            perspective: 2000px;
+            background: radial-gradient(circle, #1a1a1a 0%, #050505 100%);
+        }
+
+        /* Book Structure */
+        #book {
+            width: 450px;
+            height: 600px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 40px;
+        }
+
+        .page {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            box-sizing: border-box;
+            border-radius: 4px;
+            backface-visibility: hidden;
+        }
+
+        /* Cover Specific Styles */
+        .page-cover {
+            background-color: var(--cover-color);
+            background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+                url('https://www.transparenttextures.com/patterns/leather.png');
+            border: 2px solid var(--gold-color);
+            color: var(--gold-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .cover-title {
+            font-size: 2.2rem;
+            font-weight: 900;
+            margin-bottom: 15px;
+            letter-spacing: 4px;
+        }
+
+        .cover-subtitle {
+            font-size: 0.85rem;
+            opacity: 0.8;
+            font-style: italic;
+        }
+
+        .disclaimer-box {
+            position: absolute;
+            bottom: 40px;
+            width: 80%;
+            text-align: center;
+            font-size: 11px;
+            line-height: 1.5;
+            color: rgba(212, 175, 55, 0.6);
+            border-top: 1px solid rgba(212, 175, 55, 0.2);
+            padding-top: 15px;
+        }
+
+        /* Inner Page Styles */
+        .page-inner {
+            background-color: var(--paper-color);
+            background-image: var(--paper-grain);
+            background-blend-mode: multiply;
+            color: var(--ink-color);
+            transform: rotateY(180deg);
+            border: 1px solid #222;
+        }
+
+        .answer-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.6s ease;
+        }
+
+        .answer-zh {
+            font-size: 1.8rem;
+            font-weight: 900;
+            writing-mode: vertical-rl;
+            white-space: nowrap;
+            text-orientation: upright;
+            max-height: 400px;
+            letter-spacing: 0.25rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            display: block;
+            color: var(--ink-color);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        .answer-en {
+            color: #aaa;
+            font-size: 0.85rem;
+            font-style: italic;
+            white-space: nowrap;
+            max-width: 90%;
+            line-height: 1.4;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 20px;
+            display: block;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .page-num-indicator {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            font-family: monospace;
+            font-size: 16px;
+            color: #999;
+        }
+
+        /* Progress Bar */
+        #progress-bar-container {
+            width: 400px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--gold-color);
+            transition: width 0.1s linear;
+        }
+
+        /* Animations & States */
+        @keyframes bookShuffle {
+
+            0%,
+            100% {
+                transform: rotateY(180deg) translateY(0);
+            }
+
+            50% {
+                transform: rotateY(180deg) translateY(-5px) rotateZ(0.5deg);
+            }
+        }
+
+        .state-browsing #book {
+            animation: bookShuffle 1.2s ease-in-out infinite;
+        }
+
+        .state-revealed #book {
+            transform: rotateY(180deg) scale(1.05);
+        }
+
+        .state-revealed .answer-container {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .state-cover #book {
+            transform: rotateY(0deg);
+        }
+    </style>
+</head>
+
+<body class="state-cover">
+
+    <div id="legend">
+        <b>张开手掌 (Open Palm)</b>: 开始翻页 / Open & Flip<br>
+        <b>握拳并移开 (Fist & Drop)</b>: 查看答案 / View Answer<br>
+        <b>长按拳头 (Hold Fist 3s)</b>: 合上书籍 / Close Book
+    </div>
+
+    <div id="video-container"><video id="webcam" autoplay playsinline></video></div>
+
+    <div id="app-viewport">
+        <div id="book">
+            <div class="page page-cover">
+                <div class="cover-title">答案之书</div>
+                <div class="cover-subtitle">The Book of Answers</div>
+
+                <div class="disclaimer-box">
+                    <b>[警告]: 仅供娱乐，风险自担。</b><br>
+                    [WARNING]: For entertainment only. Use at own risk.
+                </div>
+            </div>
+
+            <div class="page page-inner">
+                <div id="page-indicator" class="page-num-indicator">P. 000</div>
+                <div class="answer-container">
+                    <div id="answer-zh" class="answer-zh"></div>
+                    <div id="answer-en" class="answer-en"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="progress-bar-container">
+            <div id="progress-fill"></div>
+        </div>
+    </div>
+
+    <script>
+        const ANSWER_BANK = [
+            { id: 1, answer: "寻求更多的选择", en: "Seek more options" },
+            { id: 2, answer: "不", en: "No" },
+            { id: 3, answer: "别忽视显而易见的东西", en: "Do not ignore the obvious" },
+            { id: 4, answer: "结果可能令人吃惊", en: "The outcome may be surprising" },
+            { id: 5, answer: "有决心就能成功", en: "Determination leads to success" },
+            { id: 6, answer: "做一次改变", en: "Make a change" },
+            { id: 7, answer: "照别人告诉你的去做", en: "Do as you are told" },
+            { id: 8, answer: "不能保证", en: "No guarantees" },
+            { id: 9, answer: "答案可能会以另一种形式出现", en: "The answer may come in another form" },
+            { id: 10, answer: "毫无疑问", en: "Without a doubt" },
+            { id: 11, answer: "这样做会使事情变得有趣", en: "Doing so will make things interesting" },
+            { id: 12, answer: "这是肯定的", en: "This is certain" },
+            { id: 13, answer: "有可能会伤害到他人", en: "It may hurt others" },
+            { id: 14, answer: "全身心投入将赢得好结果", en: "Full commitment brings good results" },
+            { id: 15, answer: "采取冒险的态度", en: "Take a risk" },
+            { id: 16, answer: "最好等待", en: "It is better to wait" },
+            { id: 17, answer: "可能会惹上麻烦", en: "It may cause trouble" },
+            { id: 18, answer: "你需要采取主动", en: "You need to take initiative" },
+            { id: 19, answer: "似乎没问题", en: "It seems fine" },
+            { id: 20, answer: "当然", en: "Of course" },
+            { id: 21, answer: "不要在意", en: "Do not worry about it" },
+            { id: 22, answer: "尽早做好它", en: "Do it as soon as possible" },
+            { id: 23, answer: "你终会发现你想知道的一切", en: "You will eventually find everything you seek" },
+            { id: 24, answer: "除非你独自一人", en: "Unless you are alone" },
+            { id: 25, answer: "是，但不要强求", en: "Yes, but do not force it" },
+            { id: 26, answer: "你需要去适应", en: "You need to adapt" },
+            { id: 27, answer: "明天再来试试", en: "Try again tomorrow" },
+            { id: 28, answer: "以更放松的态度去面对", en: "Take a more relaxed approach" },
+            { id: 29, answer: "你需要考虑其他方法", en: "Consider other approaches" },
+            { id: 30, answer: "在习惯中接受一些改变", en: "Accept some change within routine" },
+            { id: 31, answer: "要知道选择太多和选择太少一样很难", en: "Too many choices are as hard as too few" },
+            { id: 32, answer: "别浪费时间了", en: "Do not waste time" },
+            { id: 33, answer: "是", en: "Yes" },
+            { id: 34, answer: "花更多时间来决定", en: "Take more time to decide" },
+            { id: 35, answer: "灵活应对", en: "Be flexible" },
+            { id: 36, answer: "似乎已成事实", en: "It seems to be a fact" },
+            { id: 37, answer: "看开一点", en: "Take it lightly" },
+            { id: 38, answer: "问问你的异性同事", en: "Ask a colleague of the opposite sex" },
+            { id: 39, answer: "柳暗花明又一村", en: "There is light at the end of the tunnel" },
+            { id: 40, answer: "你会后悔的", en: "You will regret it" },
+            { id: 41, answer: "避免第一个解决办法", en: "Avoid the first solution" },
+            { id: 42, answer: "随它去吧", en: "Let it be" },
+            { id: 43, answer: "过段时间就不那么重要了", en: "It will not matter later" },
+            { id: 44, answer: "拭目以待", en: "Wait and see" },
+            { id: 45, answer: "相信你最初的想法", en: "Trust your initial thought" },
+            { id: 46, answer: "请不要抗拒", en: "Do not resist" },
+            { id: 47, answer: "这会带来好运", en: "This will bring good luck" },
+            { id: 48, answer: "那一定很棒", en: "That will be great" },
+            { id: 49, answer: "把它记下来", en: "Write it down" },
+            { id: 50, answer: "可能发生小意外", en: "A small accident may occur" },
+            { id: 51, answer: "学习并享受它", en: "Learn and enjoy it" },
+            { id: 52, answer: "这具有重要意义", en: "This is significant" },
+            { id: 53, answer: "防备意外发生", en: "Be prepared for surprises" },
+            { id: 54, answer: "一切将依赖于你的选择", en: "Everything depends on your choice" },
+            { id: 55, answer: "转移注意力", en: "Shift your focus" },
+            { id: 56, answer: "离开", en: "Leave" },
+            { id: 57, answer: "你需要其他人的帮助", en: "You need help from others" },
+            { id: 58, answer: "这有些特别", en: "This is somewhat special" },
+            { id: 59, answer: "不要犹豫", en: "Do not hesitate" },
+            { id: 60, answer: "先完成其他事", en: "Finish other things first" },
+            { id: 61, answer: "给自己一点时间", en: "Give yourself some time" },
+            { id: 62, answer: "现在你就能", en: "You can do it now" },
+            { id: 63, answer: "那不值得纠结", en: "It is not worth worrying about" },
+            { id: 64, answer: "那将影响别人对你的看法", en: "It will affect how others see you" },
+            { id: 65, answer: "照别人说的去做", en: "Do what others say" },
+            { id: 66, answer: "转移你的注意力", en: "Redirect your attention" },
+            { id: 67, answer: "你会失望的", en: "You will be disappointed" },
+            { id: 68, answer: "最好关注你的工作", en: "Focus on your work" },
+            { id: 69, answer: "形式尚不明朗", en: "The situation is unclear" },
+            { id: 70, answer: "不要抱有成见", en: "Do not hold prejudice" },
+            { id: 71, answer: "你必须现在就行动", en: "You must act now" },
+            { id: 72, answer: "那可能很难，但值得", en: "It may be hard, but worth it" },
+            { id: 73, answer: "付出就会有回报", en: "Effort will be rewarded" },
+            { id: 74, answer: "对意外要有思想准备", en: "Be prepared for the unexpected" },
+            { id: 75, answer: "更细心地去倾听，你就会知道", en: "Listen carefully and you will know" },
+            { id: 76, answer: "且行且思", en: "Move forward while reflecting" },
+            { id: 77, answer: "你有能力以任何方式改善", en: "You have the ability to improve things" },
+            { id: 78, answer: "这是你不会忘记的事物", en: "This is something you will not forget" },
+            { id: 79, answer: "履行你的义务", en: "Fulfill your obligations" },
+            { id: 80, answer: "快刀斩乱麻", en: "Cut through the mess quickly" },
+            { id: 81, answer: "别在这上面下赌注", en: "Do not bet on this" },
+            { id: 82, answer: "也许吧", en: "Maybe" },
+            { id: 83, answer: "专注于你的家庭生活", en: "Focus on your family life" },
+            { id: 84, answer: "绝对不", en: "Absolutely not" },
+            { id: 85, answer: "等待", en: "Wait" },
+            { id: 86, answer: "别犯傻了", en: "Do not be foolish" },
+            { id: 87, answer: "可能吧", en: "Possibly" },
+            { id: 88, answer: "表示怀疑", en: "Express doubt" },
+            { id: 89, answer: "意义非凡", en: "Highly meaningful" },
+            { id: 90, answer: "那可能非同寻常", en: "That may be extraordinary" },
+            { id: 91, answer: "不可能失败", en: "Failure is impossible" },
+            { id: 92, answer: "你需要了解更多", en: "You need to know more" },
+            { id: 93, answer: "情况很快就会有变化", en: "The situation will change soon" },
+            { id: 94, answer: "这并不重要", en: "This is not important" },
+            { id: 95, answer: "顺其自然", en: "Go with the flow" },
+            { id: 96, answer: "问问你最好的朋友", en: "Ask your best friend" },
+            { id: 97, answer: "这时不要再自找麻烦", en: "Do not create trouble now" },
+            { id: 98, answer: "晚一点处理", en: "Handle it later" },
+            { id: 99, answer: "尝试一种更可能的解决方案", en: "Try a more likely solution" },
+            { id: 100, answer: "先做重要的事", en: "Do the important things first" },
+            { id: 101, answer: "投硬币来做决定吧", en: "Flip a coin to decide" },
+            { id: 102, answer: "这也取决于另一种情况", en: "It depends on another situation" },
+            { id: 103, answer: "你最终能如愿", en: "You will eventually get what you want" },
+            { id: 104, answer: "可行", en: "Feasible" },
+            { id: 105, answer: "答案就在你家窗外", en: "The answer is outside your window" },
+            { id: 106, answer: "现在的你比以往任何时候都清楚", en: "You are clearer now than ever" },
+            { id: 107, answer: "只需说声“谢谢”", en: "Just say thank you" },
+            { id: 108, answer: "或许，等你再年长些就明白了", en: "Perhaps you will understand when older" },
+            { id: 109, answer: "这将轰动一时", en: "This will cause a sensation" },
+            { id: 110, answer: "放手一搏", en: "Go all in" },
+            { id: 111, answer: "事情会朝目标发展", en: "Things will move toward the goal" },
+            { id: 112, answer: "更细心去了解，你就知道该怎么做了", en: "Understand more carefully and you will know what to do" },
+            { id: 113, answer: "需要做更多的努力", en: "More effort is required" },
+            { id: 114, answer: "等待一个更好的机会", en: "Wait for a better opportunity" },
+            { id: 115, answer: "数到5，再试一次", en: "Count to five and try again" },
+            { id: 116, answer: "你不得不妥协", en: "You will have to compromise" },
+            { id: 117, answer: "很快就能解决", en: "It will be resolved soon" },
+            { id: 118, answer: "十分确定", en: "Very certain" },
+            { id: 119, answer: "这还不确定", en: "This is not certain yet" },
+            { id: 120, answer: "谨慎处理", en: "Handle with caution" },
+            { id: 121, answer: "全力以赴", en: "Go all out" },
+            { id: 122, answer: "重新考虑你的做法", en: "Reconsider your approach" },
+            { id: 123, answer: "问问你的母亲吧", en: "Ask your mother" },
+            { id: 124, answer: "如果你独自一人就不要", en: "Do not do it if you are alone" },
+            { id: 125, answer: "无需担忧", en: "No need to worry" },
+            { id: 126, answer: "保持开放的心态", en: "Keep an open mind" },
+            { id: 127, answer: "你会为自己所做的感到高兴的", en: "You will be glad you did it" },
+            { id: 128, answer: "发挥你的想象力", en: "Use your imagination" },
+            { id: 129, answer: "献出你的一切", en: "Give it your all" },
+            { id: 130, answer: "顺从你的意愿", en: "Follow your desire" },
+            { id: 131, answer: "先做好自己的事", en: "Take care of your own matters first" },
+            { id: 132, answer: "不要怀疑", en: "Do not doubt" },
+            { id: 133, answer: "是时候做新打算了", en: "It is time to make new plans" },
+            { id: 134, answer: "省省力气吧", en: "Save your energy" },
+            { id: 135, answer: "合作将是关键", en: "Cooperation will be key" },
+            { id: 136, answer: "此时不宜", en: "This is not the right time" },
+            { id: 137, answer: "把这看做一次机会", en: "See this as an opportunity" },
+            { id: 138, answer: "莫等待", en: "Do not wait" },
+            { id: 139, answer: "你可能不得不放弃其他东西", en: "You may have to give up something else" },
+            { id: 140, answer: "遵守规则", en: "Follow the rules" },
+            { id: 141, answer: "相关问题可能会出现", en: "Related issues may arise" },
+            { id: 142, answer: "事情将如你所愿", en: "Things will go as you wish" },
+            { id: 143, answer: "赌一把", en: "Take a gamble" },
+            { id: 144, answer: "以后再处理", en: "Deal with it later" },
+            { id: 145, answer: "结果是乐观的", en: "The outcome is optimistic" },
+            { id: 146, answer: "期待解决", en: "Expect resolution" },
+            { id: 147, answer: "灵活应对", en: "Respond flexibly" },
+            { id: 148, answer: "注意细节", en: "Pay attention to details" },
+            { id: 149, answer: "你的行动会使一切变好", en: "Your actions will improve everything" },
+            { id: 150, answer: "答案就在公园里", en: "The answer is in the park" },
+            { id: 151, answer: "消除你自身的障碍", en: "Remove your own obstacles" },
+            { id: 152, answer: "这是不明智的", en: "This is unwise" },
+            { id: 153, answer: "将需要大量的努力", en: "It will require great effort" },
+            { id: 154, answer: "不要勉强自己", en: "Do not force yourself" },
+            { id: 155, answer: "是时候做打算了", en: "It is time to make plans" },
+            { id: 156, answer: "别再犹豫了", en: "Stop hesitating" },
+            { id: 157, answer: "享受这次体验", en: "Enjoy the experience" },
+            { id: 158, answer: "要付出坚持不懈的努力", en: "Persistent effort is required" },
+            { id: 159, answer: "那仍旧无法预测", en: "That is still unpredictable" },
+            { id: 160, answer: "毋庸置疑", en: "Beyond doubt" },
+            { id: 161, answer: "多花点时间来做决定", en: "Spend more time deciding" },
+            { id: 162, answer: "只做这一次", en: "Do it only once" },
+            { id: 163, answer: "这是不明智的", en: "This is unwise" },
+            { id: 164, answer: "做些改变", en: "Make some changes" },
+            { id: 165, answer: "可行", en: "It is workable" },
+            { id: 166, answer: "先做好其他事", en: "Handle other things first" },
+            { id: 167, answer: "不要陷入到情绪之中", en: "Do not get caught in emotions" },
+            { id: 168, answer: "相信你的直觉", en: "Trust your intuition" },
+            { id: 169, answer: "采纳智者的建议", en: "Take the advice of the wise" },
+            { id: 170, answer: "情况不明了", en: "The situation is unclear" },
+            { id: 171, answer: "你不得不妥协", en: "You will have to compromise" },
+            { id: 172, answer: "列出否定的理由", en: "List the reasons against it" },
+            { id: 173, answer: "要有耐心", en: "Be patient" },
+            { id: 174, answer: "一笑置之", en: "Laugh it off" },
+            { id: 175, answer: "继续", en: "Continue" },
+            { id: 176, answer: "你必须随机应变", en: "You must adapt quickly" },
+            { id: 177, answer: "别忘记享受乐趣", en: "Do not forget to enjoy yourself" },
+            { id: 178, answer: "那是在浪费金钱", en: "That is a waste of money" },
+            { id: 179, answer: "重要的优先", en: "Prioritize what matters" },
+            { id: 180, answer: "为了做出最好的决定，务必保持冷静", en: "Stay calm to make the best decision" },
+            { id: 181, answer: "尝试一个更没把握的方法", en: "Try a less certain approach" },
+            { id: 182, answer: "清除你自身的障碍", en: "Clear your own obstacles" },
+            { id: 183, answer: "那可能已成事实", en: "That may already be a fact" },
+            { id: 184, answer: "保守你的秘密", en: "Keep your secret" },
+            { id: 185, answer: "你必须马上行动", en: "You must act immediately" },
+            { id: 186, answer: "不要妄下赌注", en: "Do not gamble recklessly" },
+            { id: 187, answer: "那可能已无法改变", en: "That may be irreversible" },
+            { id: 188, answer: "一些帮助能确保你成功", en: "Some help will ensure success" },
+            { id: 189, answer: "你肯定会获得支持", en: "You will certainly gain support" },
+            { id: 190, answer: "只做一次", en: "Do it once" },
+            { id: 191, answer: "遵循智者的建议", en: "Follow the advice of the wise" },
+            { id: 192, answer: "如你所愿", en: "As you wish" },
+            { id: 193, answer: "当局者迷", en: "Those involved are often blind" },
+            { id: 194, answer: "无论你怎么做，结果依旧", en: "The result will be the same regardless" },
+            { id: 195, answer: "先主后次", en: "Primary matters first" },
+            { id: 196, answer: "这会让你付出代价", en: "This will cost you" },
+            { id: 197, answer: "尽早行动", en: "Act early" },
+            { id: 198, answer: "寻求更多选择", en: "Seek more choices" },
+            { id: 199, answer: "你现在比以往任何时候都清楚", en: "You are clearer than ever now" },
+            { id: 200, answer: "极可能发生事故", en: "An accident is very likely" },
+            { id: 201, answer: "带着好奇去探索", en: "Explore with curiosity" },
+            { id: 202, answer: "列出这样做的理由", en: "List the reasons for doing it" },
+            { id: 203, answer: "马上停下来", en: "Stop immediately" },
+            { id: 204, answer: "这不是很确定", en: "This is not very certain" },
+            { id: 205, answer: "不用担心", en: "Do not worry" },
+            { id: 206, answer: "不要告诉别人", en: "Do not tell others" },
+            { id: 207, answer: "你需要其他人的帮助", en: "You need help from others" },
+            { id: 208, answer: "那将是一件乐事", en: "That will be enjoyable" },
+            { id: 209, answer: "不要迫于压力草率行事", en: "Do not act rashly under pressure" },
+            { id: 210, answer: "不要等待", en: "Do not wait" },
+            { id: 211, answer: "你能以任何方式改善现状", en: "You can improve the situation in many ways" },
+            { id: 212, answer: "你会为此感到高兴", en: "You will be happy about it" },
+            { id: 213, answer: "放弃之前的想法", en: "Abandon your previous idea" },
+            { id: 214, answer: "你不会忘记这些", en: "You will not forget this" },
+            { id: 215, answer: "谨慎对待", en: "Treat with caution" },
+            { id: 216, answer: "放弃你现在的想法", en: "Give up your current idea" },
+            { id: 217, answer: "有理由保持乐观", en: "There is reason to stay optimistic" },
+            { id: 218, answer: "你会发现自己难以妥协", en: "You will find it hard to compromise" },
+            { id: 219, answer: "改变不会很快发生", en: "Change will not happen quickly" },
+            { id: 220, answer: "有些障碍需要克服", en: "Some obstacles must be overcome" },
+            { id: 221, answer: "耐心点", en: "Be patient" },
+            { id: 222, answer: "果断放弃", en: "Give up decisively" },
+            { id: 223, answer: "最好把心思放在工作上", en: "Focus on your work" },
+            { id: 224, answer: "要做就做好，否则就不要去做", en: "Do it well or do not do it at all" },
+            { id: 225, answer: "深表怀疑", en: "Highly doubtful" },
+            { id: 226, answer: "最好的解决方法可能不太明显", en: "The best solution may not be obvious" },
+            { id: 227, answer: "已超出你的控制", en: "It is beyond your control" },
+            { id: 228, answer: "看看会发生什么", en: "See what happens" },
+            { id: 229, answer: "你需要更多信息", en: "You need more information" },
+            { id: 230, answer: "开阔视野", en: "Broaden your horizons" },
+            { id: 231, answer: "看得更清楚些", en: "See more clearly" },
+            { id: 232, answer: "结果可能会令人震惊", en: "The result may be shocking" },
+            { id: 233, answer: "节省你的精力吧", en: "Save your energy" },
+            { id: 234, answer: "管它呢", en: "Whatever" },
+            { id: 235, answer: "无论你做什么，结果依旧", en: "The outcome will be the same" },
+            { id: 236, answer: "那将引起一些纷争", en: "This will cause conflict" },
+            { id: 237, answer: "相关问题可能会浮出水面", en: "Related issues may surface" },
+            { id: 238, answer: "遵循其他人的建议", en: "Follow others’ advice" },
+            { id: 239, answer: "改变将不会很快发生", en: "Change will not happen soon" },
+            { id: 240, answer: "值得付出努力", en: "Worth the effort" },
+            { id: 241, answer: "负起责任来", en: "Take responsibility" },
+            { id: 242, answer: "不值得一争", en: "Not worth arguing about" },
+            { id: 243, answer: "问问你的父亲吧", en: "Ask your father" },
+            { id: 244, answer: "向别人倾诉", en: "Talk to someone" },
+            { id: 245, answer: "看起来还行", en: "It looks fine" },
+            { id: 246, answer: "绝不", en: "Absolutely not" },
+            { id: 247, answer: "等待一个更好的提议", en: "Wait for a better offer" },
+            { id: 248, answer: "你可能会遭遇反对", en: "You may face opposition" },
+            { id: 249, answer: "告诉某人那对你意味着什么", en: "Tell someone what it means to you" },
+            { id: 250, answer: "一切都取决于你的选择", en: "Everything depends on your choice" },
+            { id: 251, answer: "把这看作一个时机", en: "See this as a moment" },
+            { id: 252, answer: "不要陷入你的情绪", en: "Do not fall into emotions" },
+            { id: 253, answer: "你一定得这么做", en: "You must do this" },
+            { id: 254, answer: "享受这个过程", en: "Enjoy the process" },
+            { id: 255, answer: "不识庐山真面目，只缘身在此山中", en: "You cannot see the truth from inside" },
+            { id: 256, answer: "你不会失望的", en: "You will not be disappointed" },
+            { id: 257, answer: "是时候走了", en: "It is time to leave" },
+            { id: 258, answer: "欣然接受", en: "Accept willingly" },
+            { id: 259, answer: "遵循其他人的意见", en: "Follow others’ opinions" },
+            { id: 260, answer: "说出来吧", en: "Speak out" },
+            { id: 261, answer: "慷慨大度一些", en: "Be generous" },
+            { id: 262, answer: "你可能遭遇反对", en: "You may encounter opposition" },
+            { id: 263, answer: "你能否不要抗拒", en: "Can you stop resisting" },
+            { id: 264, answer: "有障碍需要克服", en: "There are obstacles to overcome" },
+            { id: 265, answer: "做出改变", en: "Make a change" },
+            { id: 266, answer: "无法保证", en: "Cannot be guaranteed" },
+            { id: 267, answer: "算了吧", en: "Forget it" },
+            { id: 268, answer: "合作是关键", en: "Cooperation is key" }
+        ];
+
+        const STATES = { COVER: 'state-cover', BROWSING: 'state-browsing', REVEALED: 'state-revealed' };
+        let currentState = STATES.COVER;
+        let currentIdx = 0;
+        let holdStartTime = null;
+
+        const answerZhEl = document.getElementById('answer-zh');
+        const answerEnEl = document.getElementById('answer-en');
+        const pageIndEl = document.getElementById('page-indicator');
+        const barContainer = document.getElementById('progress-bar-container');
+        const barFill = document.getElementById('progress-fill');
+
+        function isHandOpen(lm) {
+            return [8, 12, 16, 20].every(tip => lm[tip].y < lm[tip - 2].y);
+        }
+
+        function isFist(lm) {
+            return [8, 12, 16, 20].every(tip => lm[tip].y > lm[tip - 2].y);
+        }
+
+        function onResults(results) {
+            if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+                resetHoldCounter();
+                return;
+            }
+
+            const lm = results.multiHandLandmarks[0];
+            const open = isHandOpen(lm);
+            const fist = isFist(lm);
+
+            // 1. Trigger Flip (From Cover or anywhere)
+            if (open && currentState !== STATES.REVEALED) {
+                currentState = STATES.BROWSING;
+                document.body.className = STATES.BROWSING;
+                currentIdx = Math.floor(Math.random() * ANSWER_BANK.length);
+                pageIndEl.innerText = `P. ${currentIdx + 101}`;
+                resetHoldCounter();
+            }
+
+            // 2. Reveal Result
+            else if (fist && currentState === STATES.BROWSING) {
+                currentState = STATES.REVEALED;
+                document.body.className = STATES.REVEALED;
+                answerZhEl.innerText = ANSWER_BANK[currentIdx].answer;
+                answerEnEl.innerText = ANSWER_BANK[currentIdx].en;
+                resetHoldCounter();
+            }
+
+            // 3. Restart Logic (Hold Fist for 3s)
+            if (fist) {
+                if (!holdStartTime) holdStartTime = Date.now();
+                const elapsed = Date.now() - holdStartTime;
+
+                barContainer.style.opacity = 1;
+                const percent = Math.min((elapsed / 3000) * 100, 100);
+                barFill.style.width = `${percent}%`;
+
+                if (elapsed > 3000) {
+                    resetApp();
+                }
+            } else {
+                if (!open) resetHoldCounter();
+            }
+        }
+
+        function resetHoldCounter() {
+            holdStartTime = null;
+            barContainer.style.opacity = 0;
+            barFill.style.width = '0%';
+        }
+
+        function resetApp() {
+            currentState = STATES.COVER;
+            document.body.className = STATES.COVER;
+            pageIndEl.innerText = "P. 000";
+            answerZhEl.innerText = "";
+            answerEnEl.innerText = "";
+            resetHoldCounter();
+        }
+
+        // Initialize MediaPipe
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
+
+        const videoElement = document.getElementById('webcam');
+        const camera = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({ image: videoElement }); },
+            width: 640, height: 480
+        });
+        camera.start();
+    </script>
+</body>
+
+</html>
