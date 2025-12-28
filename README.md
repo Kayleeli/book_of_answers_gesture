@@ -1,4 +1,4 @@
-**The Book of Answers: Gesture Edition**
+**Book of Answers: Gesture Edition**
 
 This is a small, experimental web project that presents a virtual “book of answers” you can interact with using hand gestures and a webcam. It is meant purely for fun and exploration. The idea came from watching *The Book of Answers* being used on the show 向往的生活, and I built this as a digital version when I did not have a physical copy.
 
